@@ -1,0 +1,190 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="A research project comparing a CTR-based baseline and Logistic Regression for prioritizing declining content using historical search-performance signals.">
+<title>Identifying Declining Content | Research Paper</title>
+<style>
+:root{--ink:#202938;--muted:#596579;--line:#e1e6ed;--accent:#2859a8;--bg:#f5f7fa}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.75 system-ui,-apple-system,Segoe UI,sans-serif}
+header{background:#14233c;color:white;padding:58px 24px}
+.hero,main,footer{max-width:900px;margin:auto}
+.eyebrow{text-transform:uppercase;letter-spacing:2px;font-size:12px;color:#b9d0ff}
+h1{font-size:clamp(32px,5vw,48px);line-height:1.15;margin:14px 0}
+header p{max-width:720px;color:#d8e2f2}
+main{background:white;padding:36px clamp(20px,5vw,58px);margin:28px auto;border:1px solid var(--line);border-radius:12px}
+section{padding:22px 0;border-bottom:1px solid var(--line);scroll-margin-top:20px}
+section:last-child{border:0}
+h2{font-size:25px;line-height:1.3;margin-top:0}
+h3{font-size:18px}
+p,li{color:#354154}
+a{color:var(--accent)}
+.note{background:#f1f5fb;padding:16px 20px;border-left:4px solid var(--accent);border-radius:4px}
+table{width:100%;border-collapse:collapse;margin:20px 0}
+th,td{text-align:left;padding:12px;border-bottom:1px solid var(--line)}
+th{background:#f2f5f9}
+figure{margin:24px 0}
+.chart{display:block;width:100%;height:auto;border:1px solid var(--line);border-radius:8px}
+figcaption,small{color:var(--muted);font-size:13px}
+.metric{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.metric div{padding:18px;background:#f2f5f9;border-radius:8px}
+.metric strong{display:block;font-size:28px;color:var(--accent)}
+footer{padding:0 24px 35px;color:var(--muted);font-size:14px}
+@media(max-width:560px){header{padding:38px 20px}.metric{grid-template-columns:1fr}main{margin:12px;padding:20px}}
+</style>
+</head>
+<body>
+<header>
+<div class="hero">
+<div class="eyebrow">Machine Learning Research · Capstone</div>
+<h1>Identifying Declining Content Through Search-Performance Signals</h1>
+<p>A comparison of a CTR-based baseline and Logistic Regression for prioritizing content for human review.</p>
+<p>FlyRank ML Internship · Research and decision-support project</p>
+</div>
+</header>
+
+<main>
+<section id="abstract">
+<h2>Abstract</h2>
+<p>This study asks whether historical content characteristics and search-performance signals can help identify pages whose observed search trends are declining. Using the FlyRank ML Internship dataset, it compares a Week 4 click-through-rate (CTR) opportunity baseline with a Logistic Regression model using Precision@50 on the same client-grouped test set. The test set contained 6,163 rows, with a declining-label rate of 51.1%; the baseline achieved Precision@50 of 0.68, compared with 0.60 for Logistic Regression. In this experiment, the simpler baseline ranked labelled declining pages more effectively among its top 50 candidates than the tested model. These findings are preliminary and support prioritizing human review, not claiming that content changes will cause better search performance.</p>
+</section>
+
+<section id="introduction">
+<h2>1. Introduction / Problem Statement</h2>
+<p>Content teams need practical ways to decide which pages deserve attention. Search-performance data can provide signals of declining performance, but manually reviewing every page may be inefficient.</p>
+<p>This project evaluates whether a machine-learning ranking can improve on a simple CTR-based opportunity rule when identifying content labelled as declining. The intended decision is which pages to inspect first—not whether a page should automatically be rewritten or removed.</p>
+<div class="note"><strong>Research question:</strong> Can historical content and search-performance signals help identify pages that may need updating, refreshing, or further review?</div>
+</section>
+
+<section id="data">
+<h2>2. Data</h2>
+<p>The analysis uses the anonymized content-refresh dataset supplied for the FlyRank ML Internship. The working file used in the modeling notebook is named <code>content_refresh_anonymized.csv</code> and contains 30,000 rows and 44 original columns.</p>
+<p>Available fields include content characteristics, content age and freshness, impressions, clicks, sessions, CTR, average position, engagement measures, and the trend label.</p>
+<h3>Exclusions and public safety</h3>
+<ul>
+<li><code>client_id</code> and <code>content_id</code> were excluded from model features because they are identifiers rather than generalizable content signals.</li>
+<li><code>trend_direction</code>, <code>trend_pct</code>, and the derived binary target were excluded from predictors.</li>
+<li>Last-versus-previous-30-day impressions, clicks, and sessions were excluded because they directly contribute to or overlap with the trend-label period.</li>
+<li>Client names, private search queries, and identifying URLs are not published in this report.</li>
+</ul>
+<p><strong>Documentation limitation:</strong> The exact release identifier, source-table names, and calendar date windows were not verified in the materials available for this report. They are therefore not guessed here.</p>
+</section>
+
+<section id="methodology">
+<h2>3. Methodology</h2>
+<h3>Target and assumptions</h3>
+<p>The binary target is derived from <code>trend_direction</code>: the value <code>down</code> is labelled 1 (declining), and other values are labelled 0. This is a trend proxy, not a verified measure of whether a content refresh succeeded.</p>
+<h3>Features and leakage controls</h3>
+<p>The model uses eligible numeric and categorical content and historical performance fields. Identifier fields, the trend label, target-derived percentage, and recent-period metrics overlapping the label period are excluded. Numeric missing values are imputed using training-set medians; categorical values are imputed and one-hot encoded. Numeric inputs are standardized.</p>
+<h3>Model and baseline</h3>
+<p>Logistic Regression with balanced class weights is compared with a Week 4 CTR-opportunity baseline based on the gap between a reference CTR and page CTR, weighted by search visibility. Both methods are evaluated on the same test rows.</p>
+<h3>Validation design</h3>
+<p>A fixed-seed GroupShuffleSplit holds out 20% of clients for testing, keeping each client's rows within a single partition. Precision@50 is the primary ranking metric: the fraction of the top 50 ranked pages labelled as declining. Additional threshold-based metrics are reported for Logistic Regression.</p>
+<p>These controls reduce certain forms of leakage, but the evaluation does not replace time-based validation or testing against outcomes after content changes.</p>
+</section>
+
+<section id="results">
+<h2>4. Results: Model vs Baseline</h2>
+<p>The client-grouped test set contained 6,163 rows. Its observed declining-label rate was 51.1%.</p>
+<div class="metric">
+<div><small>CTR baseline · Precision@50</small><strong>0.68</strong></div>
+<div><small>Logistic Regression · Precision@50</small><strong>0.60</strong></div>
+</div>
+<table>
+<thead><tr><th>Method</th><th>Precision@50</th></tr></thead>
+<tbody>
+<tr><td>Week 4 CTR baseline</td><td>0.68</td></tr>
+<tr><td>Logistic Regression</td><td>0.60</td></tr>
+</tbody>
+</table>
+<figure>
+<svg class="chart" viewBox="0 0 720 360" role="img" aria-labelledby="chart-title chart-desc">
+<title id="chart-title">Precision at 50 for baseline and Logistic Regression</title>
+<desc id="chart-desc">The CTR baseline has Precision at 50 of 0.68. Logistic Regression has 0.60.</desc>
+<rect width="720" height="360" fill="white"/>
+<text x="360" y="32" text-anchor="middle" font-size="19" font-weight="600" fill="#202938">Model vs Baseline — Client-Grouped Test Set</text>
+<g stroke="#e1e6ed" stroke-width="1">
+<line x1="95" y1="280" x2="670" y2="280"/><line x1="95" y1="225" x2="670" y2="225"/><line x1="95" y1="170" x2="670" y2="170"/><line x1="95" y1="115" x2="670" y2="115"/><line x1="95" y1="60" x2="670" y2="60"/>
+</g>
+<g font-size="13" fill="#596579" text-anchor="end">
+<text x="82" y="285">0.0</text><text x="82" y="230">0.2</text><text x="82" y="175">0.4</text><text x="82" y="120">0.6</text><text x="82" y="65">0.8</text>
+</g>
+<rect x="175" y="93" width="150" height="187" rx="3" fill="#2859a8"/>
+<rect x="450" y="115" width="150" height="165" rx="3" fill="#7294c7"/>
+<g font-size="17" font-weight="600" text-anchor="middle" fill="#202938"><text x="250" y="82">0.68</text><text x="525" y="104">0.60</text></g>
+<g font-size="14" text-anchor="middle" fill="#354154"><text x="250" y="310">Week 4 CTR baseline</text><text x="525" y="310">Logistic Regression</text></g>
+<text x="25" y="170" transform="rotate(-90 25 170)" text-anchor="middle" font-size="14" fill="#354154">Precision@50</text>
+</svg>
+<figcaption>Figure 1. Both methods were evaluated on the same client-grouped test set. Values are from the modeling notebook output.</figcaption>
+</figure>
+<h3>Additional Logistic Regression metrics</h3>
+<table>
+<thead><tr><th>Metric</th><th>Value</th></tr></thead>
+<tbody>
+<tr><td>Precision at threshold 0.5</td><td>0.558</td></tr>
+<tr><td>Recall at threshold 0.5</td><td>0.6446</td></tr>
+<tr><td>F1-score at threshold 0.5</td><td>0.5982</td></tr>
+<tr><td>Average precision</td><td>0.5639</td></tr>
+</tbody>
+</table>
+<p>The CTR baseline outperformed Logistic Regression on Precision@50 in this experiment. The result suggests that the more complex model did not improve the top-50 ranking under this setup. It does not establish that the baseline is universally better.</p>
+</section>
+
+<section id="limitations">
+<h2>5. Limitations and Honest Framing</h2>
+<ul>
+<li>The label describes observed historical trend direction and may not represent business value or the outcome of refreshing a page.</li>
+<li>The result reflects one client-grouped holdout and may change under other splits or time windows.</li>
+<li>Client-grouped validation does not replace temporal validation on a later period.</li>
+<li>Precision@50 evaluates the top-ranked candidates, not the causal effect of changing their content.</li>
+<li>The available evidence does not demonstrate that the recommendations increase clicks, impressions, conversions, or revenue.</li>
+<li>The action playbook is heuristic decision support and has not been established as a validated automated intervention.</li>
+</ul>
+<p>All findings should be interpreted as measured results from this evaluation, not production guarantees or causal claims.</p>
+</section>
+
+<section id="recommendations">
+<h2>6. Ranked Recommendations</h2>
+<ol>
+<li><strong>Investigate declining content.</strong> Check whether the observed decline is meaningful and whether seasonality or measurement changes may explain it.</li>
+<li><strong>Review stale content.</strong> Inspect older pages for outdated information, examples, and structure before deciding whether to refresh them.</li>
+<li><strong>Assess thin content.</strong> Determine whether pages with limited content adequately satisfy their intended search need.</li>
+<li><strong>Review high-visibility pages.</strong> Examine pages with substantial impressions for possible relevance or CTR opportunities.</li>
+<li><strong>Keep uncertain cases in a review queue.</strong> Record the rationale for each action and monitor subsequent performance rather than automatically changing content.</li>
+</ol>
+<p>These priorities are hypotheses for human review, not proven causal interventions. Where possible, evaluate changes with a documented before-and-after or controlled design.</p>
+</section>
+
+<section id="reproducibility">
+<h2>7. Reproducibility</h2>
+<p>The analysis and supporting artifacts are intended to be inspectable in the project repository.</p>
+<ul>
+<li><a href="https://github.com/Dushyant1607/ml-internship">Project repository</a></li>
+<li><a href="https://github.com/Dushyant1607/ml-internship/tree/main/work/notebooks">Notebook directory</a></li>
+<li><a href="https://github.com/Dushyant1607/ml-internship/blob/main/work/notebooks/w05_model.ipynb">Week 5 modeling notebook</a></li>
+<li><a href="https://github.com/Dushyant1607/ml-internship/blob/main/work/notebooks/w06_validation_audit.ipynb">Week 6 validation audit</a></li>
+<li><a href="https://github.com/Dushyant1607/ml-internship/blob/main/work/notebooks/w07_action_playbook.ipynb">Week 7 action playbook</a></li>
+<li><a href="https://github.com/Dushyant1607/ml-internship/blob/main/work/notebooks/capstone.ipynb">Capstone notebook</a></li>
+</ul>
+<p>To reproduce the result, use the supplied dataset in the expected project path and run the modeling notebook in order. The reported metrics should be checked against a fresh run before making new claims. This page reports the verified notebook output available when it was prepared.</p>
+</section>
+
+<section id="artifacts">
+<h2>8. Artifacts and Interpretation</h2>
+<p>The comparison table and chart above summarize the main evaluation result. The table preserves the numeric values; the chart provides a quick visual comparison. The Logistic Regression threshold metrics add context but should not be confused with Precision@50, which is the primary ranking metric.</p>
+<p>The recommended next validation step is a time-based holdout, followed by monitoring actual performance after human-reviewed content changes. That would help assess whether the rankings remain useful outside the current evaluation.</p>
+</section>
+
+<section id="acknowledgments">
+<h2>9. Acknowledgments &amp; Data Credit</h2>
+<p>Built on the <a href="https://flyrank.ai" target="_blank" rel="noopener noreferrer">FlyRank ML Internship dataset</a>. The dataset and internship materials provided the basis for this educational research and decision-support analysis.</p>
+</section>
+</main>
+<footer>
+<p>Research artifact for educational and decision-support purposes. Metrics refer to the described test split and proxy label; they are not guarantees of future results.</p>
+</footer>
+</body>
+</html>
